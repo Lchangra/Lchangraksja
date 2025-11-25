@@ -5,14 +5,27 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+
+// Socket.io with proper CORS for Vercel
 const io = socketIo(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+    origin: [
+      "https://lchangra-dwzj8oh8l-ppodinaofficials-projects.vercel.app",
+      "https://lchangra.vercel.app", 
+      "http://localhost:3000"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Add health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
 
 // Waiting users queue
 let waitingUsers = [];
@@ -106,18 +119,13 @@ io.on('connection', (socket) => {
     console.log('Next partner requested by:', socket.id);
     const partnerId = activePairs.get(socket.id);
     if (partnerId) {
-      // Notify current partner
       socket.to(partnerId).emit('partner-disconnected');
-      
-      // Remove pair
       activePairs.delete(socket.id);
       activePairs.delete(partnerId);
     }
     
-    // Remove from waiting list
     waitingUsers = waitingUsers.filter(id => id !== socket.id);
     
-    // Find new partner
     setTimeout(() => {
       socket.emit('find-partner');
     }, 1000);
@@ -132,7 +140,6 @@ io.on('connection', (socket) => {
       activePairs.delete(partnerId);
     }
     
-    // Remove from waiting list
     waitingUsers = waitingUsers.filter(id => id !== socket.id);
   });
 });
