@@ -5,7 +5,12 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -17,6 +22,8 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('find-partner', () => {
+    console.log('Finding partner for:', socket.id);
+    
     // Remove from any existing pair
     if (activePairs.has(socket.id)) {
       const partnerId = activePairs.get(socket.id);
@@ -25,27 +32,32 @@ io.on('connection', (socket) => {
       socket.to(partnerId).emit('partner-disconnected');
     }
 
+    // Remove from waiting list if already there
+    waitingUsers = waitingUsers.filter(id => id !== socket.id);
+
     // Find partner
     if (waitingUsers.length > 0) {
       const partnerId = waitingUsers.shift();
       const partnerSocket = io.sockets.sockets.get(partnerId);
       
-      if (partnerSocket) {
+      if (partnerSocket && partnerSocket.connected) {
         // Create pair
         activePairs.set(socket.id, partnerId);
         activePairs.set(partnerId, socket.id);
         
         // Notify both users
-        socket.emit('partner-found');
-        partnerSocket.emit('partner-found');
+        socket.emit('partner-found', { partnerId });
+        partnerSocket.emit('partner-found', { partnerId });
         
         console.log(`Paired: ${socket.id} with ${partnerId}`);
       } else {
         waitingUsers.push(socket.id);
+        socket.emit('waiting-for-partner');
       }
     } else {
       waitingUsers.push(socket.id);
       socket.emit('waiting-for-partner');
+      console.log('User added to waiting list:', socket.id);
     }
   });
 
@@ -63,25 +75,35 @@ io.on('connection', (socket) => {
   socket.on('webrtc-offer', (data) => {
     const partnerId = activePairs.get(socket.id);
     if (partnerId) {
-      socket.to(partnerId).emit('webrtc-offer', data.offer);
+      socket.to(partnerId).emit('webrtc-offer', {
+        offer: data.offer,
+        from: socket.id
+      });
     }
   });
 
   socket.on('webrtc-answer', (data) => {
     const partnerId = activePairs.get(socket.id);
     if (partnerId) {
-      socket.to(partnerId).emit('webrtc-answer', data.answer);
+      socket.to(partnerId).emit('webrtc-answer', {
+        answer: data.answer,
+        from: socket.id
+      });
     }
   });
 
   socket.on('webrtc-ice-candidate', (data) => {
     const partnerId = activePairs.get(socket.id);
     if (partnerId) {
-      socket.to(partnerId).emit('webrtc-ice-candidate', data.candidate);
+      socket.to(partnerId).emit('webrtc-ice-candidate', {
+        candidate: data.candidate,
+        from: socket.id
+      });
     }
   });
 
   socket.on('next-partner', () => {
+    console.log('Next partner requested by:', socket.id);
     const partnerId = activePairs.get(socket.id);
     if (partnerId) {
       // Notify current partner
@@ -90,11 +112,10 @@ io.on('connection', (socket) => {
       // Remove pair
       activePairs.delete(socket.id);
       activePairs.delete(partnerId);
-      
-      // Find new partner for both
-      socket.emit('find-new-partner');
-      io.to(partnerId).emit('find-new-partner');
     }
+    
+    // Remove from waiting list
+    waitingUsers = waitingUsers.filter(id => id !== socket.id);
     
     // Find new partner
     setTimeout(() => {
@@ -103,6 +124,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
     const partnerId = activePairs.get(socket.id);
     if (partnerId) {
       socket.to(partnerId).emit('partner-disconnected');
@@ -112,7 +134,6 @@ io.on('connection', (socket) => {
     
     // Remove from waiting list
     waitingUsers = waitingUsers.filter(id => id !== socket.id);
-    console.log('User disconnected:', socket.id);
   });
 });
 
