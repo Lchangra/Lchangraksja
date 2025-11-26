@@ -9,34 +9,30 @@
 </head>
 <body>
     <div class="container">
-        <!-- Welcome Screen -->
-        <div id="welcomeScreen" class="screen active">
-            <div class="welcome-container">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen active">
+            <div class="login-container">
                 <div class="app-header">
-                    <h1><i class="fas fa-random"></i> Lchangra</h1>
+                    <h1><i class="fas fa-video"></i> Lchangra</h1>
                     <p>Video Chat with Random Strangers</p>
                 </div>
-                <div class="welcome-buttons">
-                    <button id="startChatBtn" class="btn-primary">
-                        <i class="fas fa-video"></i> Start Random Chat
-                    </button>
-                    <div class="features">
-                        <div class="feature">
-                            <i class="fas fa-shuffle"></i>
-                            <span>Random Partners</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-video"></i>
-                            <span>Video Calls</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-comment"></i>
-                            <span>Text Chat</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-arrow-right"></i>
-                            <span>Next Button</span>
-                        </div>
+                <div class="login-form">
+                    <input type="text" id="usernameInput" placeholder="Enter your username" maxlength="20">
+                    <input type="text" id="roomInput" placeholder="Enter room name" maxlength="20">
+                    <button id="joinButton">Start Random Chat</button>
+                </div>
+                <div class="features">
+                    <div class="feature">
+                        <i class="fas fa-shuffle"></i>
+                        <span>Random Partners</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-video"></i>
+                        <span>Video Calls</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-comment"></i>
+                        <span>Text Chat</span>
                     </div>
                 </div>
             </div>
@@ -54,7 +50,7 @@
                         </div>
                     </div>
                     <div class="header-controls">
-                        <button id="nextBtn" class="btn-next" disabled>
+                        <button id="nextBtn" class="btn-next">
                             <i class="fas fa-arrow-right"></i> Next
                         </button>
                         <button id="leaveBtn" class="btn-leave">
@@ -67,7 +63,7 @@
                 <div class="main-content">
                     <!-- Video Area -->
                     <div class="video-area">
-                        <div id="waitingScreen" class="waiting-screen active">
+                        <div id="waitingScreen" class="waiting-screen">
                             <div class="waiting-content">
                                 <div class="spinner"></div>
                                 <h3>Finding you a random partner...</h3>
@@ -75,7 +71,7 @@
                             </div>
                         </div>
 
-                        <div id="videoContainer" class="video-container hidden">
+                        <div id="videoContainer" class="video-container">
                             <div class="video-wrapper">
                                 <video id="localVideo" autoplay muted playsinline></video>
                                 <div class="video-label">You</div>
@@ -89,25 +85,20 @@
 
                     <!-- Chat Area -->
                     <div class="chat-area">
-                        <div id="messagesContainer" class="messages-container"></div>
+                        <div id="messagesContainer" class="messages-container">
+                            <div class="message system">
+                                Welcome to Lchangra! We're finding someone for you to chat with...
+                            </div>
+                        </div>
                         <div class="message-input-container">
-                            <input type="text" id="messageInput" placeholder="Type a message..." maxlength="500" disabled>
-                            <button id="sendBtn" disabled>
+                            <input type="text" id="messageInput" placeholder="Type a message..." maxlength="500">
+                            <button id="sendBtn">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Permission Modal -->
-    <div id="permissionModal" class="modal hidden">
-        <div class="modal-content">
-            <h3>Camera & Microphone Required</h3>
-            <p>Please allow camera and microphone access to start video chat.</p>
-            <button id="retryPermissions" class="btn-primary">Allow Access</button>
         </div>
     </div>
 

@@ -5,136 +5,74 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+const io = socketIo(server);
 
-// Socket.io with proper CORS for Railway
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
+app.use(express.static('public'));
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Serve main page
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Lchangra Server Running' });
-});
-
-// Waiting users queue
 let waitingUsers = [];
-let activePairs = new Map();
+let pairs = {};
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('find-partner', () => {
-    console.log('Finding partner for:', socket.id);
-    
-    // Clean up existing connections
-    if (activePairs.has(socket.id)) {
-      const partnerId = activePairs.get(socket.id);
-      activePairs.delete(socket.id);
-      activePairs.delete(partnerId);
-      socket.to(partnerId).emit('partner-disconnected');
-    }
-
-    waitingUsers = waitingUsers.filter(id => id !== socket.id);
-
-    // Find partner
+  socket.on('join-chat', (username) => {
     if (waitingUsers.length > 0) {
       const partnerId = waitingUsers.shift();
-      const partnerSocket = io.sockets.sockets.get(partnerId);
+      pairs[socket.id] = partnerId;
+      pairs[partnerId] = socket.id;
       
-      if (partnerSocket && partnerSocket.connected) {
-        // Create pair
-        activePairs.set(socket.id, partnerId);
-        activePairs.set(partnerId, socket.id);
-        
-        // Notify both users
-        socket.emit('partner-found');
-        partnerSocket.emit('partner-found');
-        
-        console.log(`Paired: ${socket.id} with ${partnerId}`);
-      } else {
-        waitingUsers.push(socket.id);
-        socket.emit('waiting-for-partner');
-      }
+      socket.emit('partner-found');
+      io.to(partnerId).emit('partner-found');
     } else {
       waitingUsers.push(socket.id);
-      socket.emit('waiting-for-partner');
+      socket.emit('waiting');
     }
   });
 
   socket.on('send-message', (data) => {
-    const partnerId = activePairs.get(socket.id);
+    const partnerId = pairs[socket.id];
     if (partnerId) {
-      socket.to(partnerId).emit('receive-message', {
-        message: data.message,
-        isOwn: false
-      });
+      io.to(partnerId).emit('message', data);
     }
   });
 
-  // WebRTC Signaling
   socket.on('webrtc-offer', (data) => {
-    const partnerId = activePairs.get(socket.id);
-    if (partnerId) {
-      socket.to(partnerId).emit('webrtc-offer', data.offer);
-    }
+    const partnerId = pairs[socket.id];
+    if (partnerId) io.to(partnerId).emit('webrtc-offer', data);
   });
 
   socket.on('webrtc-answer', (data) => {
-    const partnerId = activePairs.get(socket.id);
-    if (partnerId) {
-      socket.to(partnerId).emit('webrtc-answer', data.answer);
-    }
+    const partnerId = pairs[socket.id];
+    if (partnerId) io.to(partnerId).emit('webrtc-answer', data);
   });
 
-  socket.on('webrtc-ice-candidate', (data) => {
-    const partnerId = activePairs.get(socket.id);
-    if (partnerId) {
-      socket.to(partnerId).emit('webrtc-ice-candidate', data.candidate);
-    }
+  socket.on('ice-candidate', (data) => {
+    const partnerId = pairs[socket.id];
+    if (partnerId) io.to(partnerId).emit('ice-candidate', data);
   });
 
-  socket.on('next-partner', () => {
-    const partnerId = activePairs.get(socket.id);
+  socket.on('next', () => {
+    const partnerId = pairs[socket.id];
     if (partnerId) {
-      socket.to(partnerId).emit('partner-disconnected');
-      activePairs.delete(socket.id);
-      activePairs.delete(partnerId);
+      delete pairs[partnerId];
+      io.to(partnerId).emit('partner-left');
     }
-    
-    waitingUsers = waitingUsers.filter(id => id !== socket.id);
-    
-    setTimeout(() => {
-      socket.emit('find-partner');
-    }, 1000);
+    delete pairs[socket.id];
+    socket.emit('find-new');
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-    const partnerId = activePairs.get(socket.id);
+    const partnerId = pairs[socket.id];
     if (partnerId) {
-      socket.to(partnerId).emit('partner-disconnected');
-      activePairs.delete(socket.id);
-      activePairs.delete(partnerId);
+      io.to(partnerId).emit('partner-left');
+      delete pairs[partnerId];
     }
-    
+    delete pairs[socket.id];
     waitingUsers = waitingUsers.filter(id => id !== socket.id);
   });
 });
 
-// Use Railway's port or default to 3000
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Lchangra Random Video Chat running on port ${PORT}`);
-  console.log(`📱 Open your browser and test the app!`);
+const PORT = 5000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
